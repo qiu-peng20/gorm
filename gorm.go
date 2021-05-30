@@ -2,12 +2,14 @@ package gorm
 
 import (
 	"database/sql"
+	"gorm/dialect"
 	"gorm/log"
 	"gorm/session"
 )
 
 type Engine struct {
 	db *sql.DB
+	dialect dialect.Dialect
 }
 
 func NewEngine(driver, source string) (e *Engine, err error) {
@@ -20,8 +22,12 @@ func NewEngine(driver, source string) (e *Engine, err error) {
 		log.Error(err)
 		return
 	}
-
-	e = &Engine{db}
+	dialect2, ok := dialect.GetDialect(driver)
+	if !ok {
+		log.Errorf("dialect %s is not found",driver)
+		return
+	}
+	e = &Engine{db, dialect2}
 	log.Info("成功与数据库建立链接")
 	return
 }
@@ -34,5 +40,5 @@ func (e *Engine) Close() {
 }
 
 func (e *Engine) NewSession() *session.Session {
-	return session.New(e.db)
+	return session.New(e.db,e.dialect)
 }
