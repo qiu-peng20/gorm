@@ -51,3 +51,7 @@ func Parse(dest interface{}, d dialect.Dialect) *Schema {
 	}
 	return schema
 }
+
+func (s *Schema) RecordValues(dest interface{}) []interface{}  {
+	
+}

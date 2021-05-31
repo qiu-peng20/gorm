@@ -2,6 +2,7 @@ package session
 
 import (
 	"database/sql"
+	"gorm/clause"
 	"gorm/dialect"
 	"gorm/log"
 	"gorm/schema"
@@ -15,6 +16,7 @@ type Session struct {
 	sqlVars  []interface{}
 	dialect  dialect.Dialect
 	refTable *schema.Schema
+	clause   clause.Clause
 }
 
 func New(db *sql.DB, dialect dialect.Dialect) *Session {
@@ -25,6 +27,7 @@ func New(db *sql.DB, dialect dialect.Dialect) *Session {
 func (s *Session) Clear() {
 	s.sql.Reset()
 	s.sqlVars = nil
+	s.clause = clause.Clause{}
 }
 
 func (s *Session) DB() *sql.DB {
@@ -60,4 +63,13 @@ func (s *Session) QueryRows() (rows *sql.Rows, err error) {
 		log.Error(err)
 	}
 	return
+}
+
+func (s *Session)Insert(values ...interface{})(int64, error) {
+	recordValues := make([]interface{},0)
+	for _ , value := range values {
+		table := s.Model(value).RefTable()
+		s.clause.Set(clause.INSERT, table.Name, table.FieldName)
+		recordValues = append(recordValues, table.)
+	}
 }
