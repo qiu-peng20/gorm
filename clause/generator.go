@@ -2,10 +2,11 @@ package clause
 
 import (
 	"fmt"
+	"gorm/log"
 	"strings"
 )
 
-type generator func(values ...[]interface{}) (string, []interface{})
+type generator func(values ...interface{}) (string, []interface{})
 
 var generators map[Type]generator
 
@@ -17,6 +18,9 @@ func init() {
 	generators[SELECT] = _select
 	generators[LIMIT] = _limit
 	generators[ORDERBY] = _orderBy
+	generators[COUNT] = _count
+	generators[DELETE] = _delete
+	generators[UPDATE] = _update
 }
 
 func genBindVars(num int) string  {
@@ -29,6 +33,7 @@ func genBindVars(num int) string  {
 
 func _insert(values ...interface{}) (string, []interface{}) {
 	tableName := values[0]
+	log.Info(values)
 	fields := strings.Join(values[1].([]string),",")
 	return fmt.Sprintf("INSERT INTO %s (%v)",tableName, fields), []interface{}{}
 }
@@ -69,4 +74,24 @@ func _where(values ...interface{}) (string, []interface{}) {
 
 func _orderBy(values ...interface{})  (string, []interface{}) {
 	return fmt.Sprintf("ORDER BY %s",values[0]), []interface{}{}
+}
+
+func _update(values ...interface{}) (string, []interface{})  {
+	tableName := values[0]
+	m := values[1].(map[string]interface{})
+	var keys []string
+	var vars []interface{}
+	for k, v := range m {
+		keys = append(keys, k+" = ?")
+		vars = append(vars, v)
+	}
+	return fmt.Sprintf("UPDATE %s SET %s",tableName, strings.Join(keys, ",")), vars
+}
+
+func _count(values ...interface{}) (string, []interface{})  {
+	return _select(values[0],[]string{"count(*)"})
+}
+
+func _delete(values ...interface{}) (string, []interface{})  {
+	return fmt.Sprintf("DELETE FROM %s",values[0]),[]interface{}{}
 }

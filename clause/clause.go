@@ -1,6 +1,8 @@
 package clause
 
-import "strings"
+import (
+	"strings"
+)
 
 type Clause struct {
 	sql map[Type]string
@@ -16,6 +18,9 @@ const (
 	WHERE
 	ORDERBY
 	LIMIT
+	UPDATE
+	DELETE
+	COUNT
 )
 
 // 根据Type生成对应的sql语句
@@ -24,7 +29,7 @@ func (c *Clause) Set(name Type, vars ...interface{}) {
 		c.sql = make(map[Type]string)
 		c.sqlVars = make(map[Type][]interface{})
 	}
-	sql, lar := generators[name](vars)
+	sql, lar := generators[name](vars...)
 	c.sql[name] = sql
 	c.sqlVars[name] = lar
 }
@@ -36,7 +41,7 @@ func (c *Clause) Build(orders ...Type) (string, []interface{})   {
 	for _, order := range orders {
 		if sql,ok := c.sql[order]; ok {
 			sqls = append(sqls, sql)
-			vars = append(vars, c.sqlVars[orders]...)
+			vars = append(vars, c.sqlVars[order]...)
 		}
 	}
 	return strings.Join(sqls, " "), vars
