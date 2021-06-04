@@ -1,34 +1,35 @@
 package session
 
 import (
+	"errors"
 	"gorm/clause"
 	"reflect"
 )
 
-func (s *Session)Insert(values ...interface{})(int64, error) {
-	recordValues := make([]interface{},0)
-	for _ , value := range values {
+func (s *Session) Insert(values ...interface{}) (int64, error) {
+	recordValues := make([]interface{}, 0)
+	for _, value := range values {
 		table := s.Model(value).RefTable()
 		s.clause.Set(clause.INSERT, table.Name, table.FieldName)
 		recordValues = append(recordValues, table.RecordValues(value))
 	}
 	s.clause.Set(clause.VALUES, recordValues...)
 	sql, vars := s.clause.Build(clause.INSERT, clause.VALUES)
-	result , err := s.Raw(sql, vars...).Exec()
+	result, err := s.Raw(sql, vars...).Exec()
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
 }
 
-func (s *Session)Find(values ...interface{}) error  {
+func (s *Session) Find(values interface{}) error {
 	destSlice := reflect.Indirect(reflect.ValueOf(values))
 	destType := destSlice.Type().Elem()
 	table := s.Model(reflect.New(destType).Elem().Interface()).RefTable()
 
-	s.clause.Set(clause.SELECT,table.Name, table.FieldName)
+	s.clause.Set(clause.SELECT, table.Name, table.FieldName)
 	sql, vars := s.clause.Build(clause.SELECT, clause.WHERE, clause.ORDERBY, clause.LIMIT)
-	rows , err := s.Raw(sql, vars...).QueryRows()
+	rows, err := s.Raw(sql, vars...).QueryRows()
 	if err != nil {
 		return err
 	}
@@ -38,64 +39,78 @@ func (s *Session)Find(values ...interface{}) error  {
 		for _, name := range table.FieldName {
 			values = append(values, dest.FieldByName(name).Addr().Interface())
 		}
-		if err := rows.Scan(values...); err!= nil {
+		if err := rows.Scan(values...); err != nil {
 			return err
 		}
 		destSlice.Set(reflect.Append(destSlice, dest))
+		s.CallMethod(AfterQuery, dest.Addr().Interface())
 	}
 	return rows.Close()
 }
 
-func (s *Session)Update(values ...interface{}) (int64,error) {
-	m , ok := values[0].(map[string]interface{})
+func (s *Session) Update(values ...interface{}) (int64, error) {
+	m, ok := values[0].(map[string]interface{})
 	if !ok {
 		m = make(map[string]interface{})
-		for i:=0;i<len(values) ;i+=2  {
+		for i := 0; i < len(values); i += 2 {
 			m[values[i].(string)] = values[i+1]
 		}
 	}
 	s.clause.Set(clause.UPDATE, s.RefTable().Name, m)
-	sql , vars := s.clause.Build(clause.UPDATE, clause.WHERE)
+	sql, vars := s.clause.Build(clause.UPDATE, clause.WHERE)
 	result, err := s.Raw(sql, vars...).Exec()
 	if err != nil {
-		return 0,err
-	}
-	return result.RowsAffected()
-}
-
-func (s *Session)Delete(values ...interface{}) (int64,error)  {
-	s.clause.Set(clause.DELETE, s.RefTable().Name)
-	sql, vars := s.clause.Build(clause.DELETE,clause.WHERE)
-	result , err := s.Raw(sql, vars...).Exec()
-	if err  != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
 }
 
-func (s *Session)Count(values ...interface{})(int64,error)  {
+func (s *Session) Delete(values ...interface{}) (int64, error) {
+	s.clause.Set(clause.DELETE, s.RefTable().Name)
+	sql, vars := s.clause.Build(clause.DELETE, clause.WHERE)
+	result, err := s.Raw(sql, vars...).Exec()
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (s *Session) Count(values ...interface{}) (int64, error) {
 	s.clause.Set(clause.COUNT, s.RefTable().Name)
-	sql, vars := s.clause.Build(clause.COUNT,clause.WHERE)
+	sql, vars := s.clause.Build(clause.COUNT, clause.WHERE)
 	row := s.Raw(sql, vars...).QueryRow()
 	var tmp int64
 	if err := row.Scan(&tmp); err != nil {
-		return 0,err
+		return 0, err
 	}
 	return tmp, nil
 }
 
-func (s *Session)Limit(num int) *Session  {
+func (s *Session) Limit(num int) *Session {
 	s.clause.Set(clause.LIMIT, num)
 	return s
 }
 
-func (s *Session)Where(desc string, arg ...interface{}) *Session  {
+func (s *Session) Where(desc string, arg ...interface{}) *Session {
 	var vars []interface{}
-	s.clause.Set(clause.WHERE,append(append(vars, desc),arg...)...)
+	s.clause.Set(clause.WHERE, append(append(vars, desc), arg...)...)
 	return s
 }
 
-func (s *Session)OrderBy(desc string) *Session  {
+func (s *Session) OrderBy(desc string) *Session {
 	s.clause.Set(clause.ORDERBY, desc)
 	return s
+}
+
+func (s *Session) First(value interface{}) error {
+	dest := reflect.Indirect(reflect.ValueOf(value))
+	destSlice := reflect.New(reflect.SliceOf(dest.Type())).Elem()
+	if err := s.Limit(1).Find(destSlice.Addr().Interface()); err != nil {
+		return err
+	}
+	if destSlice.Len() == 0 {
+		return errors.New("first 有错")
+	}
+	dest.Set(destSlice.Index(0))
+	return nil
 }

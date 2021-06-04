@@ -1,6 +1,8 @@
 package session
 
-import "testing"
+import (
+	"testing"
+)
 
 var (
 	user1 = &User{"Tom",11}
@@ -35,5 +37,16 @@ func TestSession_Find(t *testing.T) {
 		t.Fatal("fatal to query all")
 	}
 }
+
+func TestSession_Limit(t *testing.T) {
+	s := testRecordInit(t)
+	var users []User
+	err := s.Limit(1).Find(&users)
+	if err != nil || len(users) != 1 {
+		t.Fatal("这里是limit的错误")
+	}
+ }
+
+
 
 
